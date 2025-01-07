@@ -1,6 +1,13 @@
 import os
+import sys
+
+# # 프로젝트 루트 디렉토리를 Python 경로에 추가
+# project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# sys.path.append(project_root)
+
 import hydra
 import warnings
+import torchvision
 from omegaconf import DictConfig
 from pytorch_lightning.loggers import WandbLogger
 from src.logger.logger import get_logger
@@ -10,31 +17,35 @@ from src.data.preprocess import preprocess_dialogsum
 from src.model.model import DialogueSummarizer
 from src.trainer.trainer import get_trainer
 
-# 경고 비활성화
-warnings.filterwarnings(action="ignore")
+# 모든 torchvision 관련 경고 비활성화
+warnings.filterwarnings(action = "ignore")
+#warnings.filterwarnings(action = "ignore", category=UserWarning, module="torchvision")
+# Beta transforms 경고 비활성화
+torchvision.disable_beta_transforms_warning()
 
 @hydra.main(version_base="1.2", config_path="configs", config_name="config")
 def main(cfg: DictConfig):
     logger = get_logger("DialogueSummarization")
     logger.info("Starting Dialogue Summarization...")
 
-    # 디렉토리 설정
+    # Ensure dataset is available
     data_dir = os.path.dirname(cfg.data.train_file)
-    outputs_dir = os.path.join(os.path.dirname(data_dir), 'outputs')
     os.makedirs(data_dir, exist_ok=True)
+    
+    # outputs 디렉토리 생성
+    outputs_dir = os.path.join(os.path.dirname(data_dir), 'outputs')
     os.makedirs(outputs_dir, exist_ok=True)
     
-    # WandB 로거 설정
+    # WandB 로거 설정 - outputs 디렉토리에 저장
     wandb_logger = WandbLogger(
         project=cfg.wandb.project,
         save_dir=outputs_dir
     )
 
-    # 데이터 준비
     download_dialogsum(data_dir)
     preprocess_dialogsum(data_dir)
 
-    # 모델 및 데이터 모듈 초기화
+    # DataModule
     data_module = DialogueDataModule(
         train_file=cfg.data.train_file,
         val_file=cfg.data.val_file,
@@ -43,17 +54,20 @@ def main(cfg: DictConfig):
         max_len=cfg.data.max_len,
     )
 
+    # Model
     model = DialogueSummarizer(
         model_name=cfg.model.name,
         learning_rate=cfg.model.learning_rate
     )
 
-    # 학습 실행
+    # Trainer
     trainer = get_trainer(
         max_epochs=cfg.trainer.max_epochs,
         logger=wandb_logger
     )
+
+    # Train
     trainer.fit(model, datamodule=data_module)
 
 if __name__ == "__main__":
-    main() 
+    main()

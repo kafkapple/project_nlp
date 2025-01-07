@@ -16,9 +16,9 @@ model:
   warmup_steps: 500
 
 trainer:
-  max_epochs: 10
+  max_epochs: 2
   gpus: 1
-  precision: 32  # 명시적으로 precision 지정
+  precision: 16  # 32에서 16으로 변경
   gradient_clip_val: 1.0
 
 evaluation:
