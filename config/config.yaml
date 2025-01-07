@@ -1,0 +1,39 @@
+defaults:
+  - override hydra/job_logging: default
+
+data:
+  train_file: "data/train.json"
+  val_file: "data/val.json"
+  batch_size: 16
+  max_len: 512
+
+model:
+  name: "facebook/bart-base"
+  tokenizer: "facebook/bart-base"
+  learning_rate: 2e-5
+  weight_decay: 0.01
+  gradient_accumulation_steps: 2
+  warmup_steps: 500
+
+trainer:
+  max_epochs: 10
+  gpus: 1
+  precision: 32  # 명시적으로 precision 지정
+  gradient_clip_val: 1.0
+
+evaluation:
+  metrics:
+    - rouge-1
+    - rouge-2
+    - rouge-l
+
+wandb:
+  project: "dialogue-summarization"
+
+logging:
+  level: "INFO"
+
+hydra:
+  run:
+    dir: .  # 현재 디렉토리에서 실행
+  output_subdir: null  # 출력 서브디렉토리 생성 방지
