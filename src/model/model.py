@@ -17,6 +17,9 @@ class DialogueSummarizer(LightningModule):
         self.best_rouge1 = 0.0
         self.best_rouge2 = 0.0
         self.best_rougel = 0.0
+        
+        # validation 결과를 저장할 리스트 추가
+        self.validation_step_outputs = []
 
     def forward(self, input_ids, attention_mask, labels=None):
         return self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
@@ -70,13 +73,14 @@ class DialogueSummarizer(LightningModule):
         self.log('val_rouge2', rouge_scores['rouge-2'], on_step=True, on_epoch=True, prog_bar=True)
         self.log('val_rougeL', rouge_scores['rouge-l'], on_step=True, on_epoch=True, prog_bar=True)
         
+        self.validation_step_outputs.append(rouge_scores)  # 결과 저장
         return {'val_loss': outputs.loss, 'rouge_scores': rouge_scores}
 
-    def validation_epoch_end(self, outputs):
-        # 에포크 평균 ROUGE 점수 계산
-        avg_rouge1 = torch.stack([x['rouge_scores']['rouge-1'] for x in outputs]).mean()
-        avg_rouge2 = torch.stack([x['rouge_scores']['rouge-2'] for x in outputs]).mean()
-        avg_rougel = torch.stack([x['rouge_scores']['rouge-l'] for x in outputs]).mean()
+    def on_validation_epoch_end(self):
+        # 에포크의 모든 validation step 결과에 대한 평균 계산
+        avg_rouge1 = torch.stack([x['rouge-1'] for x in self.validation_step_outputs]).mean()
+        avg_rouge2 = torch.stack([x['rouge-2'] for x in self.validation_step_outputs]).mean()
+        avg_rougel = torch.stack([x['rouge-l'] for x in self.validation_step_outputs]).mean()
         
         # 최고 성능 업데이트 및 로깅
         if avg_rouge1 > self.best_rouge1:
@@ -95,6 +99,9 @@ class DialogueSummarizer(LightningModule):
         self.log('epoch_rouge1', avg_rouge1)
         self.log('epoch_rouge2', avg_rouge2)
         self.log('epoch_rougeL', avg_rougel)
+        
+        # 다음 에포크를 위해 리스트 초기화
+        self.validation_step_outputs.clear()
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
